@@ -30,6 +30,7 @@
 #import "OneSignalHelper.h"
 #import "OneSignalViewHelper.h"
 #import "OSInAppMessageController.h"
+#import "OSSessionManager.h"
 #import "OneSignalCommonDefines.h"
 #import "OSInAppMessageBridgeEvent.h"
 
@@ -37,6 +38,12 @@
 #define HIGH_CONSTRAINT_PRIORITY 990.0f
 #define MEDIUM_CONSTRAINT_PRIORITY 950.0f
 #define LOW_CONSTRAINT_PRIORITY 900.0f
+
+@interface OneSignal ()
+
++ (OSSessionManager*)sessionManager;
+
+@end
 
 @interface OSInAppMessageViewController ()
 
@@ -87,9 +94,10 @@
 
 @implementation OSInAppMessageViewController
 
-- (instancetype _Nonnull)initWithMessage:(OSInAppMessage *)inAppMessage {
+- (instancetype _Nonnull)initWithMessage:(OSInAppMessage *)inAppMessage delegate:(Class<OSInAppMessageViewControllerDelegate>)delegate {
     if (self = [super init]) {
         self.message = inAppMessage;
+        self.delegate = delegate;
     }
     
     return self;
@@ -173,13 +181,6 @@
     [self addConstraintsForMessage];
     
     [self setupGestureRecognizers];
-}
-
-- (void)displayMessage {
-    [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:@"Displaying In-App Message"];
-    
-    // Sets up the message view in a hidden position while we wait
-    [self setupInitialMessageUI];
     
     // Only the center modal and full screen (both centered) IAM should have a dark background
     // So get the alpha based on the IAM being a banner or not
@@ -193,6 +194,13 @@
         
         [self animateAppearance];
     }];
+}
+
+- (void)displayMessage {
+    [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:@"Displaying In-App Message"];
+    
+    // Sets up the message view in a hidden position while we wait
+    [self setupInitialMessageUI];
 
     // If the message has a max display time, set up the timer now
     if (self.maxDisplayTime > 0.0f)
@@ -217,7 +225,10 @@
         let message = [NSString stringWithFormat:@"In App Messaging htmlContent.html: %@", data[@"hmtl"]];
         [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:message];
         
-        let baseUrl = [NSURL URLWithString:SERVER_URL];
+        if (!self.message.isPreview)
+            [[OneSignal sessionManager] onInAppMessageReceived:self.message.messageId];
+
+        let baseUrl = [NSURL URLWithString:OS_IAM_WEBVIEW_BASE_URL];
         NSString* htmlContent = data[@"html"];
         [self.messageView loadedHtmlContent:htmlContent withBaseURL:baseUrl];
         
@@ -394,10 +405,14 @@
  If velocity == 0.0, the default dismiss velocity will be used
  */
 - (void)dismissCurrentInAppMessage:(BOOL)up withVelocity:(double)velocity {
+    // Since the user dimsissed the IAM, cancel the dismissal timer
+    if (self.dismissalTimer)
+        [self.dismissalTimer invalidate];
     
     // If the rendering event never occurs any constraints being adjusted for dismissal will be nil
     // and we should bypass dismissal adjustments and animations and skip straight to the OSMessagingController callback for dismissing
     if (!self.didPageRenderingComplete) {
+        [self dismissViewControllerAnimated:false completion:nil];
         [self.delegate messageViewControllerWasDismissed];
         return;
     }
