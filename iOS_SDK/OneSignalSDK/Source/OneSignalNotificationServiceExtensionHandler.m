@@ -35,14 +35,14 @@
 #import "OneSignalInternal.h"
 #import "OneSignalReceiveReceiptsController.h"
 #import "OSSessionManager.h"
+#import "OSMigrationController.h"
 
 @implementation OneSignalNotificationServiceExtensionHandler
 
 + (UNMutableNotificationContent*)didReceiveNotificationExtensionRequest:(UNNotificationRequest*)request
                                          withMutableNotificationContent:(UNMutableNotificationContent*)replacementContent {
-    // Set default log level of NSE to VERBOSE so we get all logs from NSE logic
-    [OneSignal setLogLevel:ONE_S_LL_VERBOSE visualLevel:ONE_S_LL_NONE];
-    [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:@"NSE request received, setting OneSignal log level to VERBOSE!"];
+
+    [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:@"NSE request received"];
     
     if (!replacementContent)
         replacementContent = [request.content mutableCopy];
@@ -99,6 +99,8 @@
     if (receivedNotificationId && ![receivedNotificationId isEqualToString:@""]) {
         // Track confirmed delivery
         [OneSignal.receiveReceiptsController sendReceiveReceiptWithNotificationId:receivedNotificationId];
+        // If update was made without app being initialized/launched before -> migrate
+        [[OSMigrationController new] migrate];
         [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:[NSString stringWithFormat:@"NSE request received, sessionManager: %@", [OneSignal sessionManager]]];
         // Save received notification id
         [[OneSignal sessionManager] onNotificationReceived:receivedNotificationId];
