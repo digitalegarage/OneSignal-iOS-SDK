@@ -48,7 +48,7 @@
     return self;
 }
 
--(BOOL)subscribed {
+-(BOOL)isSubscribed {
     return self.emailUserId != nil;
 }
 
@@ -62,7 +62,7 @@
 
 - (NSString *)description {
     @synchronized (self) {
-        return [NSString stringWithFormat:@"<OSEmailSubscriptionState: emailAddress: %@, emailUserId: %@>", self.emailAddress, self.emailUserId];
+        return [NSString stringWithFormat:@"<OSEmailSubscriptionState: emailAddress: %@, emailUserId: %@, emailAuthCode: %@>", self.emailAddress, self.emailUserId, self.emailAuthCode];
     }
 }
 
@@ -79,7 +79,6 @@
     return copy;
 }
 
-
 - (void)setEmailUserId:(NSString *)emailUserId {
     BOOL changed = emailUserId != _emailUserId;
     _emailUserId = emailUserId;
@@ -92,10 +91,15 @@
     _emailAddress = emailAddress;
 }
 
+- (BOOL)isEmailSetup {
+    return _emailUserId && (!_requiresEmailAuth || _emailAuthCode);
+}
+
 - (NSDictionary *)toDictionary {
     return @{
        @"emailUserId": _emailUserId ?: [NSNull null],
-       @"emailAddress": _emailAddress ?: [NSNull null]
+       @"emailAddress": _emailAddress ?: [NSNull null],
+       @"isSubscribed": @(self.isSubscribed)
     };
 }
 

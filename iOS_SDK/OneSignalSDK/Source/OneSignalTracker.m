@@ -41,6 +41,7 @@
 #import "OSFocusCallParams.h"
 #import "OSFocusInfluenceParam.h"
 #import "OSMessagingController.h"
+#import "OSStateSynchronizer.h"
 
 @interface OneSignal ()
 
@@ -50,6 +51,8 @@
 + (NSString*)mUserId;
 + (NSString *)mEmailUserId;
 + (NSString *)mEmailAuthToken;
++ (NSString *)mExternalIdAuthToken;
++ (OSStateSynchronizer *)stateSynchronizer;
 
 @end
 
@@ -124,16 +127,8 @@ static BOOL lastOnFocusWasToBackground = YES;
         return;
     
     // If badge was set, clear it on the server as well.
-    if (wasBadgeSet) {
-        NSMutableDictionary *requests = [NSMutableDictionary new];
-        
-        requests[@"push"] = [OSRequestBadgeCount withUserId:[OneSignal mUserId] appId:[OneSignal app_id] badgeCount:@0 emailAuthToken:nil];
-        
-        if ([OneSignal mEmailUserId])
-            requests[@"email"] = [OSRequestBadgeCount withUserId:[OneSignal mEmailUserId] appId:[OneSignal app_id] badgeCount:@0 emailAuthToken:[OneSignal mEmailAuthToken]];
-        
-        [OneSignalClient.sharedClient executeSimultaneousRequests:requests withSuccess:nil onFailure:nil];
-    }
+    if (wasBadgeSet)
+        [OneSignal.stateSynchronizer sendBadgeCount:@0 appId:[OneSignal appId]];
 }
 
 + (void)applicationBackgrounded {
@@ -176,7 +171,7 @@ static BOOL lastOnFocusWasToBackground = YES;
 + (OSFocusCallParams *)createFocusCallParams:(NSArray<OSInfluence *> *)lastInfluences onSessionEnded:(BOOL)onSessionEnded  {
     let timeElapsed = [self getTimeFocusedElapsed];
     NSMutableArray<OSFocusInfluenceParam *> *focusInfluenceParams = [NSMutableArray new];
-    
+
     for (OSInfluence *influence in lastInfluences) {
         NSString *channelString = [OS_INFLUENCE_CHANNEL_TO_STRING(influence.influenceChannel) lowercaseString];
         OSFocusInfluenceParam * focusInfluenceParam = [[OSFocusInfluenceParam alloc] initWithParamsInfluenceIds:influence.ids
@@ -186,10 +181,11 @@ static BOOL lastOnFocusWasToBackground = YES;
         [focusInfluenceParams addObject:focusInfluenceParam];
     }
 
-    return [[OSFocusCallParams alloc] initWithParamsAppId:[OneSignal app_id]
+    return [[OSFocusCallParams alloc] initWithParamsAppId:[OneSignal appId]
                                                    userId:[OneSignal mUserId]
                                               emailUserId:[OneSignal mEmailUserId]
                                            emailAuthToken:[OneSignal mEmailAuthToken]
+                                      externalIdAuthToken:[OneSignal mExternalIdAuthToken]
                                                   netType:[OneSignalHelper getNetType]
                                               timeElapsed:timeElapsed
                                           influenceParams:focusInfluenceParams
