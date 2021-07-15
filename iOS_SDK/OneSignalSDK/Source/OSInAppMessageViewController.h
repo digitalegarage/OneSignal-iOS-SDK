@@ -39,7 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)messageViewDidSelectAction:(OSInAppMessage *)message withAction:(OSInAppMessageAction *)action;
 - (void)messageViewDidDisplayPage:(OSInAppMessage *)message withPageId:(NSString *)pageId;
 - (void)messageViewControllerWasDismissed;
-- (void)webViewContentFinishedLoading;
+- (void)webViewContentFinishedLoading:(OSInAppMessage *)message;
+- (void)messageIsNotActive:(OSInAppMessage *)message;
 
 @end
 
@@ -48,6 +49,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (weak, nonatomic, nullable) id<OSInAppMessageViewControllerDelegate> delegate;
 @property (strong, nonatomic, nonnull) OSInAppMessage *message;
+@property (nonatomic) BOOL waitForTags;
 
 - (instancetype _Nonnull)initWithMessage:(OSInAppMessage *)inAppMessage delegate:(id<OSInAppMessageViewControllerDelegate>)delegate;
 - (void)dismissCurrentInAppMessage;

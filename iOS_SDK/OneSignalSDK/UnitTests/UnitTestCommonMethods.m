@@ -52,13 +52,13 @@
 #import "OSOutcomeEventsCache.h"
 #import "OSInfluenceDataRepository.h"
 #import "OneSignalLocation.h"
-#import "NSUserDefaultsOverrider.h"
 #import "OneSignalNotificationServiceExtensionHandler.h"
 #import "OneSignalTrackFirebaseAnalytics.h"
 #import "OSMessagingControllerOverrider.h"
 #import "OneSignalLifecycleObserver.h"
 #import "OneSignalLocationOverrider.h"
 #import "OneSignalOverrider.h"
+#import "OneSignalUserDefaults.h"
 
 NSString * serverUrlWithPath(NSString *path) {
     return [OS_API_SERVER_URL stringByAppendingString:path];
@@ -149,6 +149,23 @@ static XCTestCase* _currentXCTestCase;
 }
 
 /*
+ Runs any blocks passed to dispatch_async() with delays after each call
+ This will allow more time for chained async methods to complete
+ */
++ (void)runLongBackgroundThreads {
+    NSLog(@"START runLongBackgroundThreads");
+    
+    [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+    
+    for(int i = 0; i < 10; i++) {
+        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        [UnitTestCommonMethods runThreadsOnEachQueue];
+    }
+    
+    NSLog(@"END runLongBackgroundThreads");
+}
+
+/*
  Runs any blocks passed to dispatch_async()
  */
 + (void)runBackgroundThreads {
@@ -156,30 +173,34 @@ static XCTestCase* _currentXCTestCase;
     
     [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
     
-    // the httpQueue makes sure all HTTP request mocks are sync'ed
-    
-    dispatch_queue_t registerUserQueue, notifSettingsQueue;
     for(int i = 0; i < 10; i++) {
-        [OneSignalHelperOverrider runBackgroundThreads];
-        
-        notifSettingsQueue = [OneSignalNotificationSettingsIOS10 getQueue];
-        if (notifSettingsQueue)
-            dispatch_sync(notifSettingsQueue, ^{});
-        
-        registerUserQueue = [OneSignal getRegisterQueue];
-        if (registerUserQueue)
-            dispatch_sync(registerUserQueue, ^{});
-        
-        [OneSignalClientOverrider runBackgroundThreads];
-        
-        [UNUserNotificationCenterOverrider runBackgroundThreads];
-        
-        dispatch_barrier_sync(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{});
-        
-        [UIApplicationOverrider runBackgroundThreads];
+        [UnitTestCommonMethods runThreadsOnEachQueue];
     }
     
     NSLog(@"END runBackgroundThreads");
+}
+
++ (void)runThreadsOnEachQueue {
+    // the httpQueue makes sure all HTTP request mocks are sync'ed
+    dispatch_queue_t registerUserQueue, notifSettingsQueue;
+    
+    [OneSignalHelperOverrider runBackgroundThreads];
+    
+    notifSettingsQueue = [OneSignalNotificationSettingsIOS10 getQueue];
+    if (notifSettingsQueue)
+        dispatch_sync(notifSettingsQueue, ^{});
+    
+    registerUserQueue = [OneSignal getRegisterQueue];
+    if (registerUserQueue)
+        dispatch_sync(registerUserQueue, ^{});
+    
+    [OneSignalClientOverrider runBackgroundThreads];
+    
+    [UNUserNotificationCenterOverrider runBackgroundThreads];
+    
+    dispatch_barrier_sync(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{});
+    
+    [UIApplicationOverrider runBackgroundThreads];
 }
 
 + (void)clearStateForAppRestart:(XCTestCase *)testCase {
@@ -245,13 +266,27 @@ static XCTestCase* _currentXCTestCase;
     _currentXCTestCase = testCase;
     [self beforeAllTest];
     [self clearStateForAppRestart:testCase];
-    
+    [self clearUserDefaults];
     [NSDateOverrider reset];
     [OneSignalOverrider reset];
     [OneSignalClientOverrider reset:testCase];
-    [NSUserDefaultsOverrider clearInternalDictionary];
     UNUserNotificationCenterOverrider.notifTypesOverride = 7;
     UNUserNotificationCenterOverrider.authorizationStatus = [NSNumber numberWithInteger:UNAuthorizationStatusAuthorized];
+}
+
++ (void)clearUserDefaults {
+    let userDefaults = OneSignalUserDefaults.initStandard.userDefaults;
+    let dictionary = [userDefaults dictionaryRepresentation];
+    for (NSString *key in dictionary.allKeys) {
+        [userDefaults removeObjectForKey:key];
+    }
+    
+    let sharedUserDefaults = OneSignalUserDefaults.initShared.userDefaults;
+    let sharedDictionary = [sharedUserDefaults dictionaryRepresentation];
+    for (NSString *key in sharedDictionary.allKeys) {
+        [sharedUserDefaults removeObjectForKey:key];
+    }
+
 }
 
 + (void)foregroundApp {
@@ -433,6 +468,14 @@ static XCTestCase* _currentXCTestCase;
 @implementation OSEmailSubscriptionStateTestObserver
 - (void)onOSEmailSubscriptionChanged:(OSEmailSubscriptionStateChanges *)stateChanges {
     NSLog(@"UnitTest:onOSEmailSubscriptionChanged: \n%@", stateChanges);
+    last = stateChanges;
+    fireCount++;
+}
+@end
+
+@implementation OSSMSSubscriptionStateTestObserver
+- (void)onOSSMSSubscriptionChanged:(OSSMSSubscriptionStateChanges *)stateChanges {
+    NSLog(@"UnitTest:onOSSMSSubscriptionChanged: \n%@", stateChanges);
     last = stateChanges;
     fireCount++;
 }

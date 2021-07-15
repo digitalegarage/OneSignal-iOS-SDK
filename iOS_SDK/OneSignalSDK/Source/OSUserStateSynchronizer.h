@@ -44,17 +44,20 @@ THE SOFTWARE.
 
 - (NSNumber * _Nonnull)getDeviceType;
 
-- (NSDictionary *)getRegistrationData:(OSUserState *)registrationState;
+- (NSDictionary * _Nonnull)getRegistrationData:(OSUserState * _Nonnull)registrationState;
 
 - (OSRequestRegisterUser * _Nonnull)registerUserWithData:(NSDictionary * _Nonnull)registrationDatad;
 
-- (OSRequestUpdateExternalUserId * _Nonnull)setExternalUserId:(NSString *_Nonnull)externalId
+- (OSRequestUpdateExternalUserId * _Nonnull)setExternalUserId:(NSString * _Nonnull)externalId
                                   withExternalIdAuthHashToken:(NSString * _Nullable)hashToken
                                                     withAppId:(NSString * _Nonnull)appId;
 
 - (OSRequestSendTagsToServer * _Nonnull)sendTagsWithAppId:(NSString * _Nonnull)appId
                                                sendingTags:(NSDictionary * _Nonnull)tags
                                                networkType:(NSNumber * _Nonnull)networkType;
+
+- (OSRequestUpdateLanguage * _Nonnull)setLanguage:(NSString * _Nonnull)language
+                                        withAppId:(NSString * _Nonnull)appId;
 
 - (OSRequestSendPurchases * _Nonnull)sendPurchases:(NSArray * _Nonnull)purchases
                                              appId:(NSString * _Nonnull)appId;

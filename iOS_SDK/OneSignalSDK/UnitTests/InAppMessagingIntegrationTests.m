@@ -44,7 +44,6 @@
 #import "UIApplicationOverrider.h"
 #import "OneSignalHelperOverrider.h"
 #import "UNUserNotificationCenterOverrider.h"
-#import "NSUserDefaultsOverrider.h"
 #import "NSBundleOverrider.h"
 #import "UNUserNotificationCenter+OneSignal.h"
 #import "Requests.h"
@@ -271,8 +270,8 @@
     [OneSignal pauseInAppMessages:false];
     
     let trigger = [OSTrigger dynamicTriggerWithKind:OS_DYNAMIC_TRIGGER_KIND_SESSION_TIME withOperator:OSTriggerOperatorTypeLessThan withValue:@10.0];
-
-    let message = [OSInAppMessageTestHelper testMessageWithTriggers:@[@[trigger]] withRedisplayLimit:@10 delay:@0];
+    
+    let message = [OSInAppMessageTestHelper testMessageWithTriggers:@[@[trigger]] withRedisplayLimit:10 delay:@0];
 
     [self initOneSignalWithInAppMessage:message];
     
@@ -389,6 +388,8 @@
     }];
 
     [OneSignal addTrigger:@"prop1" withValue:@2];
+    
+    [UnitTestCommonMethods runLongBackgroundThreads];
 
     // IAM should be shown instantly and be within the messageDisplayQueue
     XCTAssertEqual(1, OSMessagingControllerOverrider.messageDisplayQueue.count);
@@ -421,7 +422,10 @@
 
     [OneSignal addTrigger:@"prop1" withValue:@2];
 
+    [UnitTestCommonMethods runLongBackgroundThreads];
+    
     XCTAssertEqual(1, OSMessagingControllerOverrider.messageDisplayQueue.count);
+   
     // The display should cause an new "viewed" API request
     XCTAssertEqualObjects(OneSignalClientOverrider.lastHTTPRequestType, NSStringFromClass([OSRequestInAppMessageViewed class]));
 
@@ -433,6 +437,51 @@
     XCTAssertEqual(2, secondDismissedMessage.displayStats.displayQuantity);
     XCTAssertEqual(secondInterval, secondLastDisplayTime);
     XCTAssertTrue(secondLastDisplayTime - firstInterval >= delay);
+}
+
+- (void)testCachedIAMsDonotDisplayUntilRegisterUser {
+    let limit = 5;
+    let delay = 30;
+
+    let message = [OSInAppMessageTestHelper testMessageWithRedisplayLimit:limit delay:@(delay)];
+    //Time interval mock
+    NSDateComponents* comps = [[NSDateComponents alloc]init];
+    comps.year = 2019;
+    comps.month = 6;
+    comps.day = 10;
+    comps.hour = 10;
+    comps.minute = 1;
+
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDate* date = [calendar dateFromComponents:comps];
+    NSTimeInterval firstInterval = [date timeIntervalSince1970];
+    NSMutableSet <NSString *> *seenMessages = [NSMutableSet new];
+    [OSMessagingControllerOverrider setSeenMessages:seenMessages];
+
+    message.displayStats.lastDisplayTime = firstInterval - delay;
+    // Save IAM to messages cache
+    [OneSignalUserDefaults.initStandard saveCodeableDataForKey:OS_IAM_MESSAGES_ARRAY withValue:@[message]];
+    
+    [OSMessagingControllerOverrider setMockDateGenerator: ^NSTimeInterval(void) {
+        return firstInterval;
+    }];
+    
+    [OneSignal setAppId:@"b2f7f966-d8cc-11e4-bed1-df8f05be55ba"];
+    
+    [[OSMessagingController sharedInstance] updateInAppMessagesFromCache];
+
+    [OneSignal pauseInAppMessages:false];
+
+    // IAM should not be shown since we have not initialized OneSignal
+    XCTAssertEqual(0, OSMessagingControllerOverrider.messageDisplayQueue.count);
+    XCTAssertFalse(OSMessagingControllerOverrider.isInAppMessageShowing);
+    
+    [self initOneSignalWithInAppMessage:message];
+    XCTAssertEqual(1, OSMessagingControllerOverrider.messageDisplayQueue.count);
+    XCTAssertTrue(OSMessagingControllerOverrider.isInAppMessageShowing);
+    [OSMessagingControllerOverrider dismissCurrentMessage];
+    XCTAssertEqual(0, OSMessagingControllerOverrider.messageDisplayQueue.count);
+    XCTAssertFalse(OSMessagingControllerOverrider.isInAppMessageShowing);
 }
 
 - (void)testIAMClickLaunchesAPIRequestMultipleTimes_Redisplay {
@@ -544,7 +593,7 @@
 
     message.displayStats.lastDisplayTime = firstInterval - delay;
     // Save IAM for redisplay
-    [OneSignalUserDefaults.initStandard saveDictionaryForKey:OS_IAM_REDISPLAY_DICTIONARY withValue:redisplayedInAppMessages];
+    [OneSignalUserDefaults.initStandard saveCodeableDataForKey:OS_IAM_REDISPLAY_DICTIONARY withValue:redisplayedInAppMessages];
     // Set data for redisplay
     [OSMessagingControllerOverrider setMessagesForRedisplay:redisplayedInAppMessages];
     // Save IAM for dismiss
@@ -680,11 +729,11 @@
     [redisplayedInAppMessages setObject:message2 forKey:message2.messageId];
 
     [OSMessagingControllerOverrider setMessagesForRedisplay:redisplayedInAppMessages];
-    [standardUserDefaults saveDictionaryForKey:OS_IAM_REDISPLAY_DICTIONARY withValue:redisplayedInAppMessages];
+    [standardUserDefaults saveCodeableDataForKey:OS_IAM_REDISPLAY_DICTIONARY withValue:redisplayedInAppMessages];
 
     [self initOneSignalWithInAppMessage:message];
 
-    let redisplayMessagesCache = [standardUserDefaults getSavedDictionaryForKey:OS_IAM_REDISPLAY_DICTIONARY defaultValue:nil];
+    NSMutableDictionary *redisplayMessagesCache = [standardUserDefaults getSavedCodeableDataForKey:OS_IAM_REDISPLAY_DICTIONARY defaultValue:nil];
     XCTAssertTrue([redisplayMessagesCache objectForKey:message1.messageId]);
     XCTAssertFalse([redisplayMessagesCache objectForKey:message2.messageId]);
 }
@@ -748,9 +797,11 @@
     // the trigger should immediately evaluate to true and should
     // be shown once the SDK is fully initialized.
     [OneSignalClientOverrider setMockResponseForRequest:NSStringFromClass([OSRequestRegisterUser class]) withResponse:registrationResponse];
-    
+
     [UnitTestCommonMethods initOneSignal_andThreadWait];
     
+    [UnitTestCommonMethods runLongBackgroundThreads];
+
     // the message should now be displayed
     XCTAssertEqualObjects(OneSignalClientOverrider.lastHTTPRequestType, NSStringFromClass([OSRequestInAppMessageViewed class]));
 }
@@ -1056,8 +1107,8 @@
     XCTAssertEqual(outcomeWeight, [[OneSignalClientOverrider.lastHTTPRequest objectForKey:@"weight"] intValue]);
 
     let lenght = OneSignalClientOverrider.executedRequests.count;
-    XCTAssertEqual(@"outcomes/measure", [OneSignalClientOverrider.executedRequests objectAtIndex:lenght - 1].path);
-    XCTAssertEqual(@"outcomes/measure", [OneSignalClientOverrider.executedRequests objectAtIndex:lenght - 2].path);
+    XCTAssertEqualObjects(@"outcomes/measure", [OneSignalClientOverrider.executedRequests objectAtIndex:lenght - 1].path);
+    XCTAssertEqualObjects(@"outcomes/measure", [OneSignalClientOverrider.executedRequests objectAtIndex:lenght - 2].path);
     XCTAssertNotEqual(@"outcomes/measure", [OneSignalClientOverrider.executedRequests objectAtIndex:lenght - 3].path);
 
     XCTAssertEqual(outcomeName, [[OneSignalClientOverrider.executedRequests objectAtIndex:lenght - 2].parameters objectForKey:@"id"]);

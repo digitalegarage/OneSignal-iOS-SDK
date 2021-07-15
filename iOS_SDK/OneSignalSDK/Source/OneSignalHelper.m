@@ -518,7 +518,7 @@ OneSignalWebView *webVC;
     return notification;
 }
 
-//Shared instance as OneSignal is delegate of UNUserNotificationCenterDelegate and CLLocationManagerDelegate
+//Shared instance as OneSignal is delegate CLLocationManagerDelegate
 static OneSignal* singleInstance = nil;
 + (OneSignal*)sharedInstance {
     @synchronized( singleInstance ) {
@@ -537,20 +537,6 @@ static OneSignal* singleInstance = nil;
         [randomString appendFormat:@"%C", [letters characterAtIndex:rand]];
     }
     return randomString;
-}
-
-+ (void)registerAsUNNotificationCenterDelegate {
-    let curNotifCenter = [UNUserNotificationCenter currentNotificationCenter];
-    
-    /*
-        Sets the OneSignal shared instance as a delegate of UNUserNotificationCenter
-        OneSignal does not implement the delegate methods, we simply set it as a delegate
-        in order to swizzle the UNUserNotificationCenter methods in case the developer
-        does not set a UNUserNotificationCenter delegate themselves
-    */
-    
-    if (!curNotifCenter.delegate)
-        curNotifCenter.delegate = (id)[self sharedInstance];
 }
 
 + (UNNotificationRequest*)prepareUNNotificationRequest:(OSNotification*)notification {
@@ -868,19 +854,7 @@ static OneSignal* singleInstance = nil;
             });
         }];
     };
-    
-    if (url) {
-        let message = NSLocalizedString(([NSString stringWithFormat:@"Would you like to open %@://%@", url.scheme, url.host]), @"Asks whether the user wants to open the URL");
-        let title = NSLocalizedString(@"Open Website?", @"A title asking if the user wants to open a URL/website");
-        let openAction = NSLocalizedString(@"Open", @"Allows the user to open the URL/website");
-        let cancelAction = NSLocalizedString(@"Cancel", @"The user won't open the URL/website");
-        
-        [[OneSignalDialogController sharedInstance] presentDialogWithTitle:title withMessage:message withActions:@[openAction] cancelTitle:cancelAction withActionCompletion:^(int tappedActionIndex) {
-            openUrlBlock(tappedActionIndex > -1);
-        }];
-    } else {
-        openUrlBlock(true);
-    }
+    openUrlBlock(true);
 }
 
 + (void)runOnMainThread:(void(^)())block {

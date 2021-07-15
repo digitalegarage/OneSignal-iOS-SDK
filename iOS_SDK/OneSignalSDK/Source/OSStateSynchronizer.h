@@ -34,7 +34,8 @@ THE SOFTWARE.
 @interface OSStateSynchronizer : NSObject
 
 - (instancetype _Nonnull)initWithSubscriptionState:(OSSubscriptionState * _Nonnull)subscriptionState
-                        withEmailSubscriptionState:(OSEmailSubscriptionState * _Nonnull)emailSubscriptionState;
+                        withEmailSubscriptionState:(OSEmailSubscriptionState * _Nonnull)emailSubscriptionState
+                        withSMSSubscriptionState:(OSSMSSubscriptionState * _Nonnull)smsSubscriptionState;
 
 - (void)registerUserWithState:(OSUserState * _Nonnull)registrationState
                   withSuccess:(OSMultipleSuccessBlock _Nullable)successBlock
@@ -42,8 +43,19 @@ THE SOFTWARE.
 
 - (void)setExternalUserId:(NSString * _Nonnull)externalId
 withExternalIdAuthHashToken:(NSString * _Nullable)hashToken
-                withAppId:(NSString * _Nonnull)appId withSuccess:(OSUpdateExternalUserIdSuccessBlock _Nullable)successBlock
+                withAppId:(NSString * _Nonnull)appId
+              withSuccess:(OSUpdateExternalUserIdSuccessBlock _Nullable)successBlock
               withFailure:(OSUpdateExternalUserIdFailureBlock _Nullable)failureBlock;
+
+- (void)setSMSNumber:(NSString * _Nonnull)smsNumber
+withSMSAuthHashToken:(NSString * _Nullable)hashToken
+           withAppId:(NSString * _Nonnull)appId
+         withSuccess:(OSSMSSuccessBlock _Nullable)successBlock
+         withFailure:(OSSMSFailureBlock _Nullable)failureBlock;
+
+- (void)logoutSMSWithAppId:(NSString * _Nonnull)appId
+               withSuccess:(OSSMSSuccessBlock _Nullable)successBlock
+               withFailure:(OSSMSFailureBlock _Nullable)failureBlock;
 
 - (void)sendTagsWithAppId:(NSString * _Nonnull)appId
                sendingTags:(NSDictionary * _Nonnull)tag
@@ -63,5 +75,10 @@ withExternalIdAuthHashToken:(NSString * _Nullable)hashToken
                  params:(OSFocusCallParams * _Nonnull)params
             withSuccess:(OSMultipleSuccessBlock _Nullable)successBlock
               onFailure:(OSMultipleFailureBlock _Nullable)failureBlock;
+
+- (void)updateLanguage:(NSString * _Nonnull)language
+                 appId:(NSString * _Nonnull)appId
+           withSuccess:(OSUpdateLanguageSuccessBlock _Nullable)successBlock
+           withFailure:(OSUpdateLanguageFailureBlock _Nullable)failureBlock;
 
 @end

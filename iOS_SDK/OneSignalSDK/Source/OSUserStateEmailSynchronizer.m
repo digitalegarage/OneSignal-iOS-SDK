@@ -28,19 +28,24 @@ THE SOFTWARE.
 #import <Foundation/Foundation.h>
 #import "OSUserStateEmailSynchronizer.h"
 #import "OSEmailSubscription.h"
+#import "OSSubscription.h"
 
 @interface OSUserStateEmailSynchronizer ()
 
 @property (strong, nonatomic, readwrite, nonnull) OSEmailSubscriptionState *currentEmailSubscriptionState;
+@property (strong, nonatomic, readwrite, nonnull) OSSubscriptionState *currentSubscriptionState;
 
 @end
 
 @implementation OSUserStateEmailSynchronizer
 
-- (instancetype)initWithEmailSubscriptionState:(OSEmailSubscriptionState *)emailSubscriptionState {
+- (instancetype)initWithEmailSubscriptionState:(OSEmailSubscriptionState *)emailSubscriptionState
+                          withSubcriptionState:(OSSubscriptionState *)subscriptionState {
     self = [super init];
-    if (self)
+    if (self) {
         _currentEmailSubscriptionState = emailSubscriptionState;
+        _currentSubscriptionState = subscriptionState;
+    }
     return self;
 }
 
@@ -53,7 +58,7 @@ THE SOFTWARE.
 }
 
 - (NSString *)getExternalIdAuthHashToken {
-    return nil;
+    return _currentSubscriptionState.externalIdAuthCode;
 }
 
 - (NSString *)getEmailAuthHashToken {
@@ -72,12 +77,21 @@ THE SOFTWARE.
     NSMutableDictionary *emailDataDic = (NSMutableDictionary *)[registrationState.toDictionary mutableCopy];
     emailDataDic[@"device_type"] = self.getDeviceType;
     emailDataDic[@"email_auth_hash"] = self.getEmailAuthHashToken;
+    emailDataDic[@"identifier"] = _currentEmailSubscriptionState.emailAddress;
+    emailDataDic[@"device_player_id"] = _currentSubscriptionState.userId;
+    [emailDataDic removeObjectForKey:@"notification_types"];
     
     // If push device has external id we want to add it to the email device also
     if (registrationState.externalUserId)
         emailDataDic[@"external_user_id"] = registrationState.externalUserId;
     
     return emailDataDic;
+}
+
+- (OSRequestUpdateExternalUserId *)setExternalUserId:(NSString *)externalId
+                         withExternalIdAuthHashToken:(NSString *)hashToken
+                                           withAppId:(NSString *)appId {
+    return [OSRequestUpdateExternalUserId withUserId:externalId withUserIdHashToken:hashToken withOneSignalUserId:[self getId] withEmailHashToken:[self getEmailAuthHashToken] appId:appId];
 }
 
 @end

@@ -59,6 +59,7 @@ withNotificationWillShowInForegroundHandler:(OSNotificationWillShowInForegroundB
  withNotificationOpenedHandler:(OSNotificationOpenedBlock)notificationOpenedDelegate;
 
 + (void)runBackgroundThreads;
++ (void)runLongBackgroundThreads;
 + (void)clearStateForAppRestart:(XCTestCase *)testCase;
 + (void)beforeAllTest;
 + (void)beforeAllTest:(XCTestCase *)testCase;
@@ -69,6 +70,7 @@ withNotificationWillShowInForegroundHandler:(OSNotificationWillShowInForegroundB
 + (void)pullDownNotificationCenter;
 + (void)useSceneLifecycle:(BOOL)useSceneLifecycle;
 + (void)setCurrentNotificationPermissionAsUnanswered;
++ (void)clearUserDefaults;
 
 + (UNNotificationResponse*)createBasiciOSNotificationResponseWithPayload:(NSDictionary*)userInfo;
 + (UNNotification *)createBasiciOSNotificationWithPayload:(NSDictionary *)userInfo;
@@ -112,6 +114,13 @@ withNotificationWillShowInForegroundHandler:(OSNotificationWillShowInForegroundB
     @package int fireCount;
 }
 - (void)onOSEmailSubscriptionChanged:(OSEmailSubscriptionStateChanges *)stateChanges;
+@end
+
+@interface OSSMSSubscriptionStateTestObserver : NSObject<OSSMSSubscriptionObserver> {
+    @package OSSMSSubscriptionStateChanges *last;
+    @package int fireCount;
+}
+- (void)onOSSMSSubscriptionChanged:(OSSMSSubscriptionStateChanges *)stateChanges;
 @end
 
 // END - Observers

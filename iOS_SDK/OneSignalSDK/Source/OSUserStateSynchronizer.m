@@ -33,6 +33,8 @@ THE SOFTWARE.
 
 - (NSString *)getId { mustOverride(); }
 
+- (NSString *)getIdAuthHashToken{ mustOverride(); };
+
 - (NSString *)getExternalIdAuthHashToken { mustOverride(); }
 
 - (NSString *)getEmailAuthHashToken { mustOverride(); }
@@ -51,6 +53,11 @@ THE SOFTWARE.
                          withExternalIdAuthHashToken:(NSString *)hashToken
                                            withAppId:(NSString *)appId {
     return [OSRequestUpdateExternalUserId withUserId:externalId withUserIdHashToken:hashToken withOneSignalUserId:[self getId] appId:appId];
+}
+
+- (OSRequestUpdateLanguage *)setLanguage:(NSString *)language
+                               withAppId:(NSString *)appId {
+    return [OSRequestUpdateLanguage withUserId:[self getId] appId:appId language:language emailAuthToken:[self getEmailAuthHashToken] externalIdAuthToken:[self getExternalIdAuthHashToken]];
 }
 
 - (OSRequestSendTagsToServer *)sendTagsWithAppId:(NSString *)appId
@@ -80,7 +87,7 @@ THE SOFTWARE.
                                 appId:(NSString *)appId
                               netType:(NSNumber *)netType
                       influenceParams:(NSArray <OSFocusInfluenceParam *> *)influenceParams {
-    return [OSRequestOnFocus withUserId:[self getId] appId:appId activeTime:activeTime netType:netType emailAuthToken:[self getEmailAuthHashToken] externalIdAuthToken:[self getExternalIdAuthHashToken] deviceType:[self getDeviceType] influenceParams:influenceParams];
+    return [OSRequestOnFocus withUserId:[self getId] appId:appId activeTime:activeTime netType:netType deviceType:[self getDeviceType] influenceParams:influenceParams];
 }
 
 @end

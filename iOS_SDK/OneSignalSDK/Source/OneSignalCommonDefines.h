@@ -60,6 +60,8 @@
 #define OSUD_USES_PROVISIONAL_PUSH_AUTHORIZATION                            @"ONESIGNAL_USES_PROVISIONAL_PUSH_AUTHORIZATION"                    // * OSUD_USES_PROVISIONAL_PUSH_AUTHORIZATION
 #define OSUD_PERMISSION_EPHEMERAL_TO                                        @"OSUD_PERMISSION_EPHEMERAL_TO"                                     // * OSUD_PERMISSION_EPHEMERAL_TO
 #define OSUD_PERMISSION_EPHEMERAL_FROM                                      @"OSUD_PERMISSION_EPHEMERAL_FROM"                                   // * OSUD_PERMISSION_EPHEMERAL_FROM
+#define OSUD_LANGUAGE                                                       @"OSUD_LANGUAGE"                                                    // * OSUD_LANGUAGE
+#define DEFAULT_LANGUAGE                                                    @"en"                                                               // * OSUD_LANGUAGE
 // Player
 #define OSUD_EXTERNAL_USER_ID                                               @"OS_EXTERNAL_USER_ID"                                              // * OSUD_EXTERNAL_USER_ID
 #define OSUD_PLAYER_ID_TO                                                   @"GT_PLAYER_ID"                                                     // * OSUD_PLAYER_ID_TO
@@ -75,6 +77,12 @@
 #define OSUD_EMAIL_EXTERNAL_USER_ID                                         @"OSUD_EMAIL_EXTERNAL_USER_ID"                                      // OSUD_EMAIL_EXTERNAL_USER_ID
 #define OSUD_REQUIRE_EMAIL_AUTH                                             @"GT_REQUIRE_EMAIL_AUTH"                                            // * OSUD_REQUIRE_EMAIL_AUTH
 #define OSUD_EMAIL_AUTH_CODE                                                @"GT_EMAIL_AUTH_CODE"                                               // * OSUD_EMAIL_AUTH_CODE
+// SMS
+#define OSUD_SMS_NUMBER                                                     @"OSUD_SMS_NUMBER"
+#define OSUD_SMS_PLAYER_ID                                                  @"OSUD_SMS_PLAYER_ID"
+#define OSUD_SMS_EXTERNAL_USER_ID                                           @"OSUD_SMS_EXTERNAL_USER_ID"
+#define OSUD_REQUIRE_SMS_AUTH                                               @"OSUD_REQUIRE_SMS_AUTH"
+#define OSUD_SMS_AUTH_CODE                                                  @"OSUD_SMS_AUTH_CODE"
 // Notification
 #define OSUD_LAST_MESSAGE_OPENED                                            @"GT_LAST_MESSAGE_OPENED_"                                          // * OSUD_MOST_RECENT_NOTIFICATION_OPENED
 #define OSUD_NOTIFICATION_OPEN_LAUNCH_URL                                   @"ONESIGNAL_INAPP_LAUNCH_URL"                                       // * OSUD_NOTIFICATION_OPEN_LAUNCH_URL
@@ -107,6 +115,8 @@
 #define OSUD_APP_LAST_CLOSED_TIME                                           @"GT_LAST_CLOSED_TIME"                                              // * OSUD_APP_LAST_CLOSED_TIME
 #define OSUD_UNSENT_ACTIVE_TIME                                             @"GT_UNSENT_ACTIVE_TIME"                                            // * OSUD_UNSENT_ACTIVE_TIME
 #define OSUD_UNSENT_ACTIVE_TIME_ATTRIBUTED                                  @"GT_UNSENT_ACTIVE_TIME_ATTRIBUTED"                                 // * OSUD_UNSENT_ACTIVE_TIME_ATTRIBUTED
+#define OSUD_PLAYER_TAGS                                                    @"OSUD_PLAYER_TAGS"
+    // * OSUD_PLAYER_TAGS
 
 // Deprecated Selectors
 #define DEPRECATED_SELECTORS @[ @"application:didReceiveLocalNotification:", \
@@ -127,11 +137,16 @@
 #define IOS_FBA @"fba"
 #define IOS_USES_PROVISIONAL_AUTHORIZATION @"uses_provisional_auth"
 #define IOS_REQUIRES_EMAIL_AUTHENTICATION @"require_email_auth"
+#define IOS_REQUIRES_SMS_AUTHENTICATION @"require_sms_auth"
 #define IOS_REQUIRES_USER_ID_AUTHENTICATION @"require_user_id_auth"
 #define IOS_RECEIVE_RECEIPTS_ENABLE @"receive_receipts_enable"
 #define IOS_OUTCOMES_V2_SERVICE_ENABLE @"v2_enabled"
 #define IOS_LOCATION_SHARED @"location_shared"
 #define IOS_REQUIRES_USER_PRIVACY_CONSENT @"requires_user_privacy_consent"
+
+// SMS Parameter Names
+#define SMS_NUMBER_KEY @"sms_number"
+#define SMS_NUMBER_AUTH_HASH_KEY @"sms_auth_hash"
 
 // Info.plist key
 #define FALLBACK_TO_SETTINGS_MESSAGE @"Onesignal_settings_fallback_message"
@@ -185,9 +200,10 @@ typedef enum {ATTRIBUTED, NOT_ATTRIBUTED} FocusAttributionState;
 // OneSignal constants
 #define OS_PUSH @"push"
 #define OS_EMAIL @"email"
+#define OS_SMS @"sms"
 #define OS_SUCCESS @"success"
 
-#define OS_CHANNELS @[OS_PUSH, OS_EMAIL]
+#define OS_CHANNELS @[OS_PUSH, OS_EMAIL, OS_SMS]
 
 // OneSignal API Client Defines
 typedef enum {GET, POST, HEAD, PUT, DELETE, OPTIONS, CONNECT, TRACE} HTTPMethod;
@@ -228,6 +244,9 @@ typedef enum {GET, POST, HEAD, PUT, DELETE, OPTIONS, CONNECT, TRACE} HTTPMethod;
 // Device types
 #define DEVICE_TYPE_PUSH 0
 #define DEVICE_TYPE_EMAIL 11
+#define DEVICE_TYPE_SMS 14
+
+#define MAX_NSE_LIFETIME_SECOUNDS 30
 
 #ifndef OS_TEST
     // OneSignal API Client Defines
@@ -243,7 +262,10 @@ typedef enum {GET, POST, HEAD, PUT, DELETE, OPTIONS, CONNECT, TRACE} HTTPMethod;
     #define MAX_CATEGORIES_SIZE 128
 
     // Defines how long the SDK will wait for a OSPredisplayNotification's complete method to execute
-#define CUSTOM_DISPLAY_TYPE_TIMEOUT 25.0
+    #define CUSTOM_DISPLAY_TYPE_TIMEOUT 25.0
+
+    // Defines the maximum delay time for confirmed deliveries
+    #define MAX_CONF_DELIVERY_DELAY 25.0
 #else
     // Test defines for API Client
     #define REATTEMPT_DELAY 0.004
@@ -259,7 +281,11 @@ typedef enum {GET, POST, HEAD, PUT, DELETE, OPTIONS, CONNECT, TRACE} HTTPMethod;
 
     // Unit testing value for how long the SDK will wait for a
     // OSPredisplayNotification's complete method to execute
-#define CUSTOM_DISPLAY_TYPE_TIMEOUT 0.05
+    #define CUSTOM_DISPLAY_TYPE_TIMEOUT 0.05
+
+    // We don't want to delay confirmed deliveries in unit tests
+    #define MAX_CONF_DELIVERY_DELAY 0
+
 #endif
 
 // A max timeout for a request, which might include multiple reattempts

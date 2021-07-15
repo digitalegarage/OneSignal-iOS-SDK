@@ -81,6 +81,8 @@
 
 @property (nonatomic) BOOL isAppInactive;
 
+@property (nonatomic) BOOL calledLoadTags;
+
 @end
 
 @implementation OSMessagingController
@@ -158,7 +160,6 @@ static BOOL _isInAppMessagingPaused = false;
 
 - (void)updateInAppMessagesFromCache {
     self.messages = [OneSignalUserDefaults.initStandard getSavedCodeableDataForKey:OS_IAM_MESSAGES_ARRAY defaultValue:[NSArray new]];
-
     [self evaluateMessages];
 }
 
@@ -171,6 +172,7 @@ static BOOL _isInAppMessagingPaused = false;
     if (self.messages)
         [OneSignalUserDefaults.initStandard saveCodeableDataForKey:OS_IAM_MESSAGES_ARRAY withValue:self.messages];
 
+    self.calledLoadTags = NO;
     [self resetRedisplayMessagesBySession];
     [self evaluateMessages];
     [self deleteOldRedisplayedInAppMessages];
@@ -181,6 +183,19 @@ static BOOL _isInAppMessagingPaused = false;
 
     for (NSString *messageId in _redisplayedInAppMessages) {
         [_redisplayedInAppMessages objectForKey:messageId].isDisplayedInSession = false;
+    }
+}
+
+- (void)deleteInactiveMessage:(OSInAppMessage *)message {
+    let deleteMessage = [NSString stringWithFormat:@"Deleting inactive in-app message from cache: %@", message.messageId];
+    [OneSignal onesignal_Log:ONE_S_LL_ERROR message:deleteMessage];
+    NSMutableArray *newMessagesArray = [NSMutableArray arrayWithArray:self.messages];
+    [newMessagesArray removeObject: message];
+    self.messages = newMessagesArray;
+    if (self.messages) {
+        [OneSignalUserDefaults.initStandard saveCodeableDataForKey:OS_IAM_MESSAGES_ARRAY withValue:self.messages];
+    } else {
+        [OneSignalUserDefaults.initStandard removeValueForKey:OS_IAM_MESSAGES_ARRAY];
     }
 }
 
@@ -204,7 +219,7 @@ static BOOL _isInAppMessagingPaused = false;
             [newRedisplayDictionary removeObjectForKey:messageId];
         }
 
-        [OneSignalUserDefaults.initStandard saveDictionaryForKey:OS_IAM_REDISPLAY_DICTIONARY withValue:newRedisplayDictionary];
+        [OneSignalUserDefaults.initStandard saveCodeableDataForKey:OS_IAM_REDISPLAY_DICTIONARY withValue:newRedisplayDictionary];
     }
 }
 
@@ -225,8 +240,9 @@ static BOOL _isInAppMessagingPaused = false;
             [self.messageDisplayQueue addObject:message];
         
         // Return early if an IAM is already showing
-        if (self.isInAppMessageShowing)
+        if (self.isInAppMessageShowing) {
             return;
+        }
         // Return early if the app is not active
         if (![UIApplication applicationIsActive]) {
             [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:@"Pause IAMs display due to app inactivity"];
@@ -270,20 +286,37 @@ static BOOL _isInAppMessagingPaused = false;
         [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:@"In app messages will not show while paused"];
         return;
     }
-    
     self.isInAppMessageShowing = true;
-    [self showAndImpressMessage:message];
+    [self showMessage:message];
 }
 
-- (void)showAndImpressMessage:(OSInAppMessage *)message {
+- (void)showMessage:(OSInAppMessage *)message {
     self.viewController = [[OSInAppMessageViewController alloc] initWithMessage:message delegate:self];
-
+    if (message.hasLiquid && !self.calledLoadTags) {
+        self.viewController.waitForTags = YES;
+        [self loadTags];
+    }
     dispatch_async(dispatch_get_main_queue(), ^{
-           [[self.viewController view] setNeedsLayout];
-           [self messageViewImpressionRequest:message];
+        [[self.viewController view] setNeedsLayout];
     });
 }
 
+- (void)sendMessageImpression:(OSInAppMessage *)message {
+    if ([self shouldSendImpression:message]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self messageViewImpressionRequest:message];
+        });
+    }
+}
+
+- (void)loadTags {
+    self.calledLoadTags = YES;
+    [OneSignal getTags:^(NSDictionary *result) {
+        if (self.viewController) {
+            self.viewController.waitForTags = NO;
+        }
+    }];
+}
 - (void)messageViewPageImpressionRequest:(OSInAppMessage *)message withPageId:(NSString *)pageId {
     if (message.isPreview) {
         [OneSignal onesignal_Log:ONE_S_LL_VERBOSE message:[NSString stringWithFormat:@"Not sending page impression for preview message. ID: %@",pageId]];
@@ -451,7 +484,8 @@ static BOOL _isInAppMessagingPaused = false;
 - (BOOL)shouldShowInAppMessage:(OSInAppMessage *)message {
     return ![self.seenInAppMessages containsObject:message.messageId] &&
            [self.triggerController messageMatchesTriggers:message] &&
-           ![message isFinished];
+           ![message isFinished] &&
+           OneSignal.isRegisterUserFinished;
 }
 
 - (void)handleMessageActionWithURL:(OSInAppMessageAction *)action {
@@ -663,6 +697,10 @@ static BOOL _isInAppMessagingPaused = false;
     });
 }
 
+- (void)messageIsNotActive:(OSInAppMessage *)message {
+    [self deleteInactiveMessage:message];
+}
+
 /*
 * Show the developer what will happen with a non IAM preview
  */
@@ -740,10 +778,14 @@ static BOOL _isInAppMessagingPaused = false;
 /*
  This method must be called on the Main thread
  */
-- (void)webViewContentFinishedLoading {
+- (void)webViewContentFinishedLoading:(OSInAppMessage *)message {
     if (!self.viewController) {
         [self evaluateMessages];
         return;
+    }
+    
+    if (message) {
+        [self sendMessageImpression:message];
     }
     
     if (!self.window) {
@@ -831,7 +873,7 @@ static BOOL _isInAppMessagingPaused = false;
 #pragma mark OSInAppMessageViewControllerDelegate Methods
 - (void)messageViewControllerWasDismissed {}
 - (void)messageViewDidSelectAction:(OSInAppMessage *)message withAction:(OSInAppMessageAction *)action {}
-- (void)webViewContentFinishedLoading {}
+- (void)webViewContentFinishedLoading:(OSInAppMessage *)message {}
 #pragma mark OSTriggerControllerDelegate Methods
 - (void)triggerConditionChanged {}
 - (void)dynamicTriggerCompleted:(NSString *)triggerId {}
